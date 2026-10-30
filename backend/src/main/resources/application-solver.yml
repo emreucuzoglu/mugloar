@@ -1,0 +1,11 @@
+spring:
+  main:
+    web-application-type: none
+    banner-mode: off
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss} %msg%n"
+  level:
+    root: WARN
+    com.mugloar: INFO

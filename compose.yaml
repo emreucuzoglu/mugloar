@@ -1,0 +1,54 @@
+name: mugloar
+
+services:
+  backend:
+    image: eclipse-temurin:25-jdk
+    init: true
+    working_dir: /app
+    command: sh docker-dev.sh
+    environment:
+      GRADLE_USER_HOME: /gradle-home
+      # Docker Desktop doesn't forward Windows/macOS file events reliably, so Gradle must not trust them.
+      GRADLE_OPTS: -Dorg.gradle.vfs.watch=false
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./backend:/app
+      - ./contract:/contract:ro
+      - backend-gradle-home:/gradle-home
+      - backend-gradle-project:/app/.gradle
+      - backend-build:/app/build
+
+  frontend:
+    image: node:26-bookworm-slim
+    init: true
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    environment:
+      BACKEND_URL: http://backend:8080
+      # Same reason as GRADLE_OPTS above: Vite has to poll to notice edits.
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./frontend:/app
+      - ./contract:/contract:ro
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - backend
+
+  e2e:
+    profiles: [e2e]
+    image: mcr.microsoft.com/playwright:v1.64.1-noble
+    init: true
+    working_dir: /app
+    command: npx playwright test
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+
+volumes:
+  backend-gradle-home:
+  backend-gradle-project:
+  backend-build:
+  frontend-node-modules:

@@ -1,0 +1,162 @@
+:root {
+  --ink: #241a12;
+  --ink-soft: #55473a;
+  --frame: #1c1712;
+  --line: #a9a294;
+  --panel: rgb(244 243 239 / 0.96);
+  --page: #f4f3ef;
+  --field: #fff;
+
+  --parchment: #e6d3a4;
+  --parchment-wash: radial-gradient(ellipse at 50% 40%, #efdfb6 30%, #e0ca95 75%, #cfb377 100%);
+  --on-parchment: #2a1c0f;
+  --on-parchment-soft: #55432a;
+
+  --ember: #b03624;
+  --ember-deep: #7c2214;
+
+  --gold: #e0ad45;
+  --gold-ink: #7f5808;
+  --heart: #c4231c;
+  --risk-safe: #1d6a4f;
+  --risk-fair: #66720f;
+  --risk-risky: #a35c0a;
+  --risk-deadly: #a8281f;
+
+  --focus: #0b57d0;
+
+  --font-display: 'Macondo Swash Caps', Georgia, serif;
+  --font-body: 'Open Sans', 'Segoe UI', system-ui, sans-serif;
+
+  --step--1: 0.8rem;
+  --step-0: 1rem;
+  --text-small: 0.875rem;
+  --step-1: 1.25rem;
+  --step-2: 1.563rem;
+  --step-3: 1.953rem;
+
+  --gap: 1rem;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.15;
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--btn-colour, var(--ember));
+  background: transparent;
+  color: var(--btn-colour, var(--ember));
+  font-weight: 600;
+}
+
+.btn--primary {
+  background: var(--btn-colour, var(--ember));
+  color: #fff;
+}
+
+.btn--quiet {
+  border-color: transparent;
+  text-decoration: underline;
+  font-weight: 400;
+}
+
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    background: var(--btn-colour, var(--ember));
+    color: #fff;
+  }
+
+  .btn--primary:hover:not(:disabled) {
+    background: var(--btn-hover, var(--ember-deep));
+    border-color: var(--btn-hover, var(--ember-deep));
+  }
+}
+
+.btn:disabled {
+  opacity: 0.45;
+}
+
+.panel--busy .btn:disabled:not(.btn--short) {
+  opacity: 1;
+  cursor: progress;
+}
+
+.btn--short {
+  --btn-colour: var(--ink-soft);
+}
+
+.layout button,
+.layout h2 {
+  scroll-margin-top: 15rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

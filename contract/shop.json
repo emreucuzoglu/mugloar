@@ -1,0 +1,8 @@
+[
+  {
+    "id": "hpot",
+    "name": "Healing potion",
+    "cost": 50,
+    "recommended": true
+  }
+]

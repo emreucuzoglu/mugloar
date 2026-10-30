@@ -1,0 +1,9 @@
+{
+  "gameId": "g1",
+  "lives": 2,
+  "gold": 75,
+  "level": 3,
+  "score": 250,
+  "highScore": 250,
+  "turn": 9
+}

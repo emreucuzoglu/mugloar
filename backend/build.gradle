@@ -1,0 +1,115 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'checkstyle'
+    id 'info.solidsoft.pitest' version '1.19.0'
+    id 'org.springframework.boot' version '4.1.2'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.diffplug.spotless' version '8.10.4'
+}
+
+group = 'com.mugloar'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.apache.commons:commons-lang3'
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+spotless {
+    lineEndings = 'UNIX'
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat('2.0.0')
+    }
+    format('misc') {
+        target 'build.gradle', 'src/**/*.yml', '*.sh'
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+checkstyle {
+    toolVersion = '14.4.0'
+}
+
+tasks.named('test') {
+    useJUnitPlatform {
+        excludeTags 'live'
+    }
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+    }
+    finalizedBy 'jacocoTestReport'
+}
+
+tasks.named('jacocoTestReport') {
+    reports {
+        html.required = true
+        csv.required = true
+    }
+}
+
+pitest {
+    junit5PluginVersion = '1.2.3'
+    targetClasses = ['com.mugloar.domain.*', 'com.mugloar.solver.strategy.*', 'com.mugloar.gateway.QuestDecoder']
+    targetTests = ['com.mugloar.domain.*', 'com.mugloar.solver.strategy.*', 'com.mugloar.gateway.QuestDecoderTest']
+    threads = 4
+    outputFormats = ['HTML', 'CSV']
+    timestampedReports = false
+}
+
+tasks.register('liveContract', Test) {
+    group = 'verification'
+    description = 'Checks the live game still matches the code. Starts one game on the public server.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'live'
+    }
+    outputs.upToDateWhen { false }
+    testLogging {
+        events 'passed', 'failed'
+        exceptionFormat 'full'
+    }
+}
+
+tasks.register('solve', JavaExec) {
+    group = 'application'
+    description = 'Runs the headless solver against the live game API.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.mugloar.MugloarApplication'
+    standardInput = System.in
+    systemProperty 'spring.devtools.restart.enabled', 'false'
+    def games = project.findProperty('games') ?: '1'
+    def target = project.findProperty('target') ?: '0'
+    args = ['--spring.profiles.active=solver',
+            '--spring.main.web-application-type=none',
+            "--mugloar.solver.games=${games}",
+            "--mugloar.solver.target-score=${target}"]
+}

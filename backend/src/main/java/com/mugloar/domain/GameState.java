@@ -1,0 +1,97 @@
+package com.mugloar.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.HashMap;
+import java.util.Map;
+import lombok.With;
+
+@With
+public record GameState(
+    String gameId,
+    int lives,
+    int gold,
+    int level,
+    int score,
+    int highScore,
+    int turn,
+    @JsonIgnore double stateReputation,
+    @JsonIgnore Map<String, Integer> itemsBought) {
+
+  public GameState {
+    itemsBought = itemsBought == null ? Map.of() : Map.copyOf(itemsBought);
+  }
+
+  public GameState(
+      String gameId, int lives, int gold, int level, int score, int highScore, int turn) {
+    this(gameId, lives, gold, level, score, highScore, turn, 0);
+  }
+
+  public GameState(
+      String gameId,
+      int lives,
+      int gold,
+      int level,
+      int score,
+      int highScore,
+      int turn,
+      double stateReputation) {
+    this(gameId, lives, gold, level, score, highScore, turn, stateReputation, Map.of());
+  }
+
+  public GameState after(SolveResult r) {
+    return new GameState(
+        gameId,
+        r.lives(),
+        r.gold(),
+        level,
+        r.score(),
+        r.highScore(),
+        r.turn(),
+        stateReputation,
+        itemsBought);
+  }
+
+  public GameState after(PurchaseResult r) {
+    return new GameState(
+        gameId,
+        r.lives(),
+        r.gold(),
+        r.level(),
+        score,
+        highScore,
+        r.turn(),
+        stateReputation,
+        itemsBought);
+  }
+
+  public GameState afterBuying(String itemId) {
+    Map<String, Integer> bought = new HashMap<>(itemsBought);
+    bought.merge(itemId, 1, Integer::sum);
+    return withItemsBought(bought);
+  }
+
+  public int timesBought(String itemId) {
+    return itemsBought.getOrDefault(itemId, 0);
+  }
+
+  public GameState afterTurn() {
+    return withTurn(turn + 1);
+  }
+
+  public GameState afterWinning(QuestType type) {
+    return withStateReputation(stateReputation + type.reputationChange().state());
+  }
+
+  public GameState afterPossibleWin(QuestType type) {
+    return withStateReputation(stateReputation + Math.min(0, type.reputationChange().state()));
+  }
+
+  public GameState ended() {
+    return withLives(0);
+  }
+
+  @JsonIgnore
+  public boolean isOver() {
+    return lives <= 0;
+  }
+}

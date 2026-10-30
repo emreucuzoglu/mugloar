@@ -1,0 +1,16 @@
+[
+  {
+    "type": "PURCHASE",
+    "success": true,
+    "message": "Bought Healing potion for 50 gold",
+    "state": {
+      "gameId": "g1",
+      "lives": 3,
+      "gold": 10,
+      "level": 0,
+      "score": 0,
+      "highScore": 0,
+      "turn": 4
+    }
+  }
+]

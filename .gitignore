@@ -1,0 +1,25 @@
+# Backend
+backend/.gradle/
+backend/.settings/
+backend/build/
+backend/bin/
+backend/.project
+*.class
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+# IDE / OS
+.idea/
+.vscode/
+.claude/
+.remember/
+CLAUDE.md
+.DS_Store
+.project
+*.iml
+*.log

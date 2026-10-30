@@ -1,0 +1,17 @@
+[
+  {
+    "questId": "a1",
+    "message": "Escort a friend to pasture",
+    "reward": 61,
+    "expiresIn": 6,
+    "probability": "Walk in the park",
+    "encrypted": true,
+    "questType": "Escort",
+    "trap": false,
+    "rank": 1,
+    "recommended": true,
+    "successChance": 0.84,
+    "expectedValue": 27.24,
+    "acceptable": true
+  }
+]
