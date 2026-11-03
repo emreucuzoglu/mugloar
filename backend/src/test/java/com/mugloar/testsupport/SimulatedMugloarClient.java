@@ -16,8 +16,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.EnumMap;
+import java.util.IntSummaryStatistics;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class SimulatedMugloarClient extends MugloarClient {
@@ -38,30 +41,28 @@ public class SimulatedMugloarClient extends MugloarClient {
 
   private static final int BOARD_SIZE = 10;
   private static final double TRAP_SHARE = 0.38;
-  private static final int REWARD_PER_LEVEL = 5;
+  private static final int REWARD_PER_LEVEL = 6;
   private static final int FIRST_TENS_OF_LEVELS = 10;
   private static final int SECOND_TENS_OF_LEVELS = 20;
   private static final int THIRD_TENS_OF_LEVELS = 30;
   private static final double STEPS_PER_LEVEL_BELOW_10 = 0.115;
   private static final double STEPS_PER_LEVEL_BELOW_20 = 0.038;
   private static final double STEPS_PER_LEVEL_BELOW_30 = 0.003;
-  private static final int BIG_ITEMS_IN_THE_SET = 5;
-  private static final int SET_EFFECT_FIRST_TURN = 40;
-  private static final int SET_EFFECT_LAST_TURN = 69;
-  private static final double SET_EFFECT_LABEL_STEPS = 1;
   private static final int TURNS_PER_BAND = 10;
 
   /**
-   * Labels of new jobs per ten turns, from the games that bought one of each big item: their mean
-   * and spread as an index into {@link #LABELS}. From turn 140 every job is "Impossible".
+   * Labels of new jobs per ten turns before turn 40, as an index into {@link #LABELS}: their mean
+   * and spread in the games that rotated the big items.
    */
-  private static final double[] LABEL_MEAN_BY_BAND = {
-    2.70, 3.46, 4.76, 3.88, 3.16, 4.70, 6.37, 7.75, 8.70, 9.32, 9.63, 9.84, 9.94, 9.99, 10
-  };
+  private static final double[] EARLY_LABEL_MEAN_BY_BAND = {2.74, 3.52, 4.73, 3.82};
 
-  private static final double[] LABEL_SPREAD_BY_BAND = {
-    2.25, 2.57, 3.07, 2.81, 2.18, 2.48, 2.38, 1.91, 1.35, 0.80, 0.51, 0.38, 0.23, 0.11, 0
-  };
+  private static final double[] EARLY_LABEL_SPREAD_BY_BAND = {2.27, 2.62, 3.11, 2.78};
+
+  private static final double LABEL_AT_TURN_ZERO = -3.185;
+
+  private static final double LABEL_PER_TURN = 0.1792;
+  private static final double LABEL_PER_ROUND = 1.427;
+  private static final double LATE_LABEL_SPREAD = 2.17;
   private static final int BIG_ITEM_LEVELS = 2;
   private static final int SERVICE_UNAVAILABLE = 503;
 
@@ -86,24 +87,63 @@ public class SimulatedMugloarClient extends MugloarClient {
   public int trapsTaken;
   public int avoidableTraps;
   public int callsAfterGameOver;
+  public int refusedPurchases;
+  public int lostReplies;
 
   private final List<String> bought = new ArrayList<>();
+  private final Map<Item, Integer> bigItemCounts = new EnumMap<>(Item.class);
   private final Random faults;
   private final double serverErrorRate;
+  private final double lostReplyRate;
 
   public SimulatedMugloarClient(long seed) {
     this(seed, 0);
   }
 
   public SimulatedMugloarClient(long seed, double serverErrorRate) {
+    this(seed, serverErrorRate, 0);
+  }
+
+  /**
+   * @param serverErrorRate share of calls that fail before the server acts on them
+   * @param lostReplyRate share of moves the server makes but whose answer never arrives
+   */
+  public SimulatedMugloarClient(long seed, double serverErrorRate, double lostReplyRate) {
     super(null, null, null);
     this.random = new Random(seed);
     this.faults = new Random(seed);
     this.serverErrorRate = serverErrorRate;
+    this.lostReplyRate = lostReplyRate;
   }
 
   public double stateReputation() {
     return stateReputation;
+  }
+
+  public int gold() {
+    return gold;
+  }
+
+  public int lives() {
+    return lives;
+  }
+
+  public int level() {
+    return level;
+  }
+
+  public int turn() {
+    return turn;
+  }
+
+  /** How many more times the most bought +2 item was bought than the least bought one. */
+  public int bigItemSpread() {
+    IntSummaryStatistics counts =
+        Arrays.stream(Item.values())
+            .filter(item -> item.levelsGained() == BIG_ITEM_LEVELS)
+            .mapToInt(item -> bigItemCounts.getOrDefault(item, 0))
+            .summaryStatistics();
+    return counts.getMax() - counts.getMin();
   }
 
   public List<String> bigItemsBought() {
@@ -146,6 +186,7 @@ public class SimulatedMugloarClient extends MugloarClient {
       lives--;
     }
     advanceTurn();
+    maybeLoseTheReply();
     String message =
         trap
             ? "You fell into a trap"
@@ -167,11 +208,17 @@ public class SimulatedMugloarClient extends MugloarClient {
     if (item != null) {
       purchases++;
       bought.add(item.id());
+      if (item.levelsGained() == BIG_ITEM_LEVELS) {
+        bigItemCounts.merge(item, 1, Integer::sum);
+      }
       gold -= item.cost();
       lives += item.livesGained();
       gainLevels(item.levelsGained());
+    } else {
+      refusedPurchases++;
     }
     advanceTurn();
+    maybeLoseTheReply();
     return new PurchaseResultDTO(item != null, gold, lives, level, turn);
   }
 
@@ -200,17 +247,24 @@ public class SimulatedMugloarClient extends MugloarClient {
     return level < THIRD_TENS_OF_LEVELS ? STEPS_PER_LEVEL_BELOW_30 : 0;
   }
 
-  private double missingSetPenalty() {
-    boolean ownsTheSet = bigItemsBought().stream().distinct().count() >= BIG_ITEMS_IN_THE_SET;
-    boolean inWindow = turn >= SET_EFFECT_FIRST_TURN && turn <= SET_EFFECT_LAST_TURN;
-    return !ownsTheSet && inWindow ? SET_EFFECT_LABEL_STEPS : 0;
+  private int roundsOfBigItems() {
+    return Arrays.stream(Item.values())
+        .filter(item -> item.levelsGained() == BIG_ITEM_LEVELS)
+        .mapToInt(item -> bigItemCounts.getOrDefault(item, 0))
+        .min()
+        .orElse(0);
   }
 
   private double difficultyOfANewJob() {
-    int band = Math.min(turn / TURNS_PER_BAND, LABEL_MEAN_BY_BAND.length - 1);
-    return LABEL_MEAN_BY_BAND[band]
-        + random.nextGaussian() * LABEL_SPREAD_BY_BAND[band]
-        + missingSetPenalty();
+    int band = turn / TURNS_PER_BAND;
+    if (band < EARLY_LABEL_MEAN_BY_BAND.length) {
+      return EARLY_LABEL_MEAN_BY_BAND[band]
+          + random.nextGaussian() * EARLY_LABEL_SPREAD_BY_BAND[band];
+    }
+    return LABEL_AT_TURN_ZERO
+        + LABEL_PER_TURN * turn
+        - LABEL_PER_ROUND * roundsOfBigItems()
+        + random.nextGaussian() * LATE_LABEL_SPREAD;
   }
 
   private void requireLive(String id) {
@@ -220,6 +274,14 @@ public class SimulatedMugloarClient extends MugloarClient {
     }
     if (faults.nextDouble() < serverErrorRate) {
       throw new MugloarApiException(SERVICE_UNAVAILABLE, "simulated outage");
+    }
+  }
+
+  /** Draws only when lost replies are on, so seeds without them play exactly as before. */
+  private void maybeLoseTheReply() {
+    if (lostReplyRate > 0 && faults.nextDouble() < lostReplyRate) {
+      lostReplies++;
+      throw new MugloarApiException(SERVICE_UNAVAILABLE, "simulated lost reply");
     }
   }
 

@@ -18,6 +18,8 @@ export default tseslint.config(
       'no-undef': 'off',
       curly: ['error', 'all'],
       '@stylistic/brace-style': ['error', '1tbs', { allowSingleLine: false }],
+      '@stylistic/space-before-blocks': 'error',
+      '@stylistic/keyword-spacing': 'error',
     },
   },
 )

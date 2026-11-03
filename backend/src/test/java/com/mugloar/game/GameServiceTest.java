@@ -320,15 +320,16 @@ class GameServiceTest {
   }
 
   @Test
-  void unansweredPurchaseLeavesTheSessionUnchanged() {
+  void unansweredPurchaseIsRecordedAsASkipThatKeepsTheKnownGold() {
     when(client.startGame()).thenReturn(aGameStartDto().gold(60).build());
     when(client.buy("g1", "hpot")).thenThrow(SERVER_DOWN);
     GameState start = service.start();
 
-    assertThatThrownBy(() -> service.buy("g1", "hpot")).isSameAs(SERVER_DOWN);
+    TurnEvent event = service.buy("g1", "hpot");
 
-    assertThat(service.state("g1")).isEqualTo(start);
-    assertThat(service.history("g1")).isEmpty();
+    assertThat(event.type()).isEqualTo(TurnEvent.Type.SKIP);
+    assertThat(service.state("g1").gold()).isEqualTo(start.gold());
+    assertThat(service.history("g1")).containsExactly(event);
   }
 
   @Test

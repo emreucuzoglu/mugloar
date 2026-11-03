@@ -2,6 +2,8 @@ package com.mugloar.solver.strategy;
 
 import com.mugloar.domain.GameState;
 import com.mugloar.domain.Item;
+import com.mugloar.domain.Probability;
+import com.mugloar.domain.Quest;
 import com.mugloar.domain.ShopItem;
 import java.util.Comparator;
 import java.util.List;
@@ -18,7 +20,7 @@ public final class BalancedShoppingStrategy implements ShoppingStrategy {
   @NonNull private final ShoppingSettings settings;
 
   @Override
-  public Optional<ShopItem> nextPurchase(GameState state, List<ShopItem> shop) {
+  public Optional<ShopItem> nextPurchase(GameState state, List<ShopItem> shop, List<Quest> board) {
     if (state.isOver() || shop == null || shop.isEmpty()) {
       return Optional.empty();
     }
@@ -28,14 +30,27 @@ public final class BalancedShoppingStrategy implements ShoppingStrategy {
           .filter(item -> item.cost() <= state.gold())
           .findFirst();
     }
+    if (harvesting(board)) {
+      return Optional.empty();
+    }
     return bestUpgrade(state, shop);
   }
 
-  /** Among equal gains, the item bought least comes first: rotating the +2 items scored highest. */
+  private boolean harvesting(List<Quest> board) {
+    long sureThings =
+        board.stream()
+            .filter(quest -> quest.probability() == Probability.SURE_THING)
+            .filter(quest -> !quest.questType().isTrap())
+            .count();
+    return settings.harvestAtSureThings() > 0 && sureThings >= settings.harvestAtSureThings();
+  }
+
+  /**
+   * Among equal gains, the item bought least comes first: rotating the +2 items scored highest.
+   * There is no last turn for upgrades, because quests get harder with turns unless the buying
+   * keeps up.
+   */
   private Optional<ShopItem> bestUpgrade(GameState state, List<ShopItem> shop) {
-    if (state.turn() >= settings.upgradesUntilTurn()) {
-      return Optional.empty();
-    }
     int budget = state.gold() - settings.goldReserve();
     int biggestGain =
         shop.stream().mapToInt(item -> gain(item, Item::levelsGained)).max().orElse(0);

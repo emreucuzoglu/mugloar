@@ -31,8 +31,5 @@ public record MugloarProperties(
     shopping = shopping == null ? ShoppingSettings.defaults() : shopping;
   }
 
-  /**
-   * @param targetScore stop a game at this score; 0 plays until the dragon dies
-   */
-  public record Solver(@Min(1) int games, @Min(0) int targetScore, @Min(1) int maxMoves) {}
+  public record Solver(@Min(1) int games, @Min(0) int targetScore, @Min(0) int maxMoves) {}
 }

@@ -2,7 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGameStore } from './stores/game'
-import { formatNumber } from './utils/format'
+import { formatNumber, hasTarget } from './utils/format'
 import QuestBoard from './components/QuestBoard.vue'
 import DragonSketch from './components/DragonSketch.vue'
 import ErrorBanner from './components/ErrorBanner.vue'
@@ -56,7 +56,9 @@ const announcement = computed(() => {
     return banner.value
   }
   if (autoplaying.value) {
-    return `Autoplaying to ${formatNumber(target.value)} points.`
+    return hasTarget(target.value)
+      ? `Autoplaying to ${formatNumber(target.value)} points.`
+      : 'Autoplaying until the dragon dies.'
   }
   if (!lastMove.value) {
     return banner.value
@@ -92,7 +94,8 @@ onMounted(() => store.resume())
 
       <div class="panel__top">
         <p v-if="landing" class="panel__sub">
-          Take jobs, keep your dragon alive, reach {{ formatNumber(target) }} points.
+          Take jobs, keep your dragon alive,
+          {{ hasTarget(target) ? `reach ${formatNumber(target)} points.` : 'score as many points as you can.' }}
         </p>
         <GameControls
           :has-game="game !== null"
@@ -123,7 +126,7 @@ onMounted(() => store.resume())
             </p>
             <p class="intro__text">
               <strong>Let the solver run:</strong> it weighs each job's reward against its risk. Watch one turn at a
-              time, or autoplay to a target score.
+              time, or autoplay until the dragon dies or reaches a target score.
             </p>
           </div>
         </template>
@@ -133,6 +136,7 @@ onMounted(() => store.resume())
             :quests="quests"
             :disabled="!canAct"
             :over="isOver"
+            :autoplaying="autoplaying"
             :loading="loading"
             :suggested-item="suggestedItem"
             @take="store.solve"
@@ -145,6 +149,7 @@ onMounted(() => store.resume())
               :gold="game?.gold ?? 0"
               :disabled="!canAct"
               :over="isOver"
+              :autoplaying="autoplaying"
               :has-game="game !== null"
               :loading="loading"
               @buy="store.buy"

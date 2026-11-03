@@ -83,7 +83,7 @@ describe('App', () => {
     expect(wrapper.find('.panel__sub').exists()).toBe(false)
     const panel = Array.from(wrapper.get('.panel').element.children)
     expect(panel.indexOf(wrapper.get('.hud').element)).toBeLessThan(panel.indexOf(wrapper.get('.panel__top').element))
-    expect(wrapper.get('.hud').find('.stats__fill').exists()).toBe(true)
+    expect(wrapper.get('.hud').find('.stats__number').exists()).toBe(true)
     expect(wrapper.get('.hud').find('.outcome').exists()).toBe(true)
   })
 
@@ -106,6 +106,7 @@ describe('App', () => {
     const wrapper = await mountApp(fakeApi({ autoplayStep }))
     await clickButton(wrapper, 'Start a game')
 
+    await wrapper.get('#target').setValue('1000')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     const status = wrapper.get('[role="status"]')
@@ -121,6 +122,25 @@ describe('App', () => {
     expect(status.text()).toBe('Turn 2: Finished +600 points. Target reached.')
   })
 
+  it('autoplays until the dragon dies by default, showing the score alone', async () => {
+    let release: (events: TurnEvent[]) => void = () => {}
+    const autoplayStep = vi.fn(() => new Promise<TurnEvent[]>((resolve) => (release = resolve)))
+    const wrapper = await mountApp(fakeApi({ autoplayStep }))
+    await clickButton(wrapper, 'Start a game')
+
+    expect((wrapper.get('#target').element as HTMLInputElement).value).toBe('0')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.get('[role="status"]').text()).toBe('Autoplaying until the dragon dies.')
+    expect(wrapper.get('.outcome').text()).toContain('Autoplaying until the dragon dies…')
+
+    release([event('Big win', { score: 250_000 })])
+    await flushPromises()
+    expect(autoplayStep).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('.stats__number').text()).toBe('250,000 points')
+    expect(wrapper.find('[role="progressbar"]').exists()).toBe(false)
+  })
+
   it('swaps the dragon for the board, shop and stats once a game starts', async () => {
     const wrapper = await mountApp(fakeApi())
 
@@ -129,7 +149,7 @@ describe('App', () => {
     expect(wrapper.find('.sketch').exists()).toBe(false)
     expect(wrapper.text()).toContain('Help a farmer')
     expect(wrapper.text()).toContain('Healing potion')
-    expect(wrapper.find('.stats__fill').exists()).toBe(true)
+    expect(wrapper.find('.stats__number').exists()).toBe(true)
   })
 
   it('goes back to the dragon when the server forgets the game', async () => {

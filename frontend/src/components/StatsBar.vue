@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { GameState } from '../api'
-import { formatNumber, percent } from '../utils/format'
+import { formatNumber, hasTarget, percent } from '../utils/format'
 
 const props = defineProps<{ game: GameState; target: number; progress: number }>()
 
@@ -15,15 +15,18 @@ const lifeMarks = computed(() => Math.min(Math.max(props.game.lives, 0), MAX_LIF
   <section class="stats" aria-label="Game status">
     <div class="stats__score">
       <p class="stats__number">
-        {{ formatNumber(game.score) }}<span class="stats__of"> / {{ formatNumber(target) }} points</span>
+        {{ formatNumber(game.score)
+        }}<span v-if="hasTarget(target)" class="stats__of"> / {{ formatNumber(target) }} points</span
+        ><span v-else class="stats__of"> points</span>
       </p>
       <div
+        v-if="hasTarget(target)"
         class="stats__track"
         role="progressbar"
         :aria-valuenow="Math.min(game.score, target)"
         aria-valuemin="0"
         :aria-valuemax="target"
-        :aria-label="`Score ${game.score} of ${target}`"
+        :aria-label="`Score ${formatNumber(game.score)} of ${formatNumber(target)}`"
       >
         <div class="stats__fill" :style="{ width: percent(progress) }"></div>
       </div>

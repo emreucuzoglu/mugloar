@@ -76,7 +76,7 @@ async function mockApi(page: Page, { text = 'Help a farmer', lives = 3 } = {}) {
 async function startGame(page: Page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Start a game' }).click()
-  await expect(page.getByRole('progressbar')).toBeVisible()
+  await expect(page.locator('.stats__number')).toBeVisible()
 }
 
 /** A move puts entries in the log, which only appears once there is something to show. */

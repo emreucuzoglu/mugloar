@@ -10,6 +10,21 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 const state = { gameId: 'g1', lives: 3, gold: 0, level: 0, score: 0, highScore: 0, turn: 0 }
 const event = { type: 'SOLVE', success: true, message: 'Done', state }
+const quest = {
+  questId: 'a1',
+  message: 'Help',
+  reward: 10,
+  expiresIn: 3,
+  probability: 'Sure thing',
+  encrypted: false,
+  questType: 'Help',
+  trap: false,
+  rank: 1,
+  recommended: true,
+  successChance: 0.95,
+  expectedValue: 9.5,
+  acceptable: true,
+}
 
 function respondWith(body: unknown): typeof fetch {
   return vi.fn().mockResolvedValue(jsonResponse(body))
@@ -100,11 +115,19 @@ describe('createApi', () => {
     ['a list that is not a list', () => createApi({ fetchFn: respondWith({}) }).getQuests('g1')],
     ['a shop item with the wrong type', () =>
       createApi({ fetchFn: respondWith([{ id: 'hpot', name: 'Potion', cost: '50', recommended: false }]) }).getShop('g1')],
+    ['a quest without the solver verdict', () =>
+      createApi({ fetchFn: respondWith([{ ...quest, acceptable: undefined }]) }).getQuests('g1')],
   ])('rejects %s', async (_name, call) => {
     const error = await call().catch((e) => e)
 
     expect(error).toBeInstanceOf(ApiError)
     expect(error.message).toMatch(/could not be read/)
+  })
+
+  it('accepts a complete quest', async () => {
+    const quests = await createApi({ fetchFn: respondWith([quest]) }).getQuests('g1')
+
+    expect(quests).toEqual([quest])
   })
 
   it('accepts a turn type it has not seen before', async () => {

@@ -21,7 +21,8 @@ class MugloarApplicationTests {
   void contextLoadsWithConfiguredStrategy() {
     assertThat(autoPlayer).isNotNull();
     assertThat(props.baseUrl().toString()).isEqualTo("https://dragonsofmugloar.com/api/v2");
-    assertThat(props.solver().maxMoves()).isEqualTo(2000);
+    assertThat(props.solver().targetScore()).isZero();
+    assertThat(props.solver().maxMoves()).isZero();
     assertThat(props.corsOrigins()).contains("http://localhost:5173", "http://127.0.0.1:5173");
   }
 

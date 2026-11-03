@@ -90,11 +90,12 @@ test('plays a turn on the production build without a CSP violation', async ({ pa
   await mockApi(page)
 
   await startGame(page)
-  await page.getByRole('button', { name: 'Solver plays one turn' }).click()
+  await page.getByLabel('Autoplay to').fill('30')
+  await page.getByRole('button', { name: 'Autoplay' }).click()
 
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '30')
   const fill = page.locator('.stats__fill')
-  await expect.poll(() => fill.evaluate((el) => (el as HTMLElement).style.width)).toBe('3%')
+  await expect.poll(() => fill.evaluate((el) => (el as HTMLElement).style.width)).toBe('100%')
   expect(errors).toEqual([])
 })
 
@@ -116,7 +117,7 @@ test('keeps keyboard focus on a control button after its turn', async ({ page })
   await page.getByRole('button', { name: 'Solver plays one turn' }).focus()
   await page.keyboard.press('Enter')
 
-  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '30')
+  await expect(page.locator('.stats__number')).toHaveText('30 points')
   await expect.poll(() => focusedLabel(page)).toBe('BUTTON:Solver plays one turn')
 })
 
@@ -137,6 +138,7 @@ test('the autoplay button keeps focus while it turns into stop and back', async 
   const stepGate = new Promise<void>((resolve) => (release = resolve))
   await mockApi(page, { after: { score: 2000, turn: 1 }, stepGate })
   await startGame(page)
+  await page.getByLabel('Autoplay to').fill('1000')
 
   await page.getByRole('button', { name: 'Autoplay', exact: true }).focus()
   await page.keyboard.press('Enter')

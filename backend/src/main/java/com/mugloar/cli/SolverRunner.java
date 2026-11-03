@@ -22,6 +22,9 @@ import org.springframework.stereotype.Component;
 @Profile("solver")
 class SolverRunner implements CommandLineRunner {
 
+  /** The brief's goal, counted in the summary. */
+  private static final int REQUIRED_SCORE = 1000;
+
   private final MugloarGateway gateway;
   private final AutoPlayer player;
   private final MugloarProperties props;
@@ -50,7 +53,7 @@ class SolverRunner implements CommandLineRunner {
       return;
     }
     var scores = results.stream().mapToInt(GameResult::score).summaryStatistics();
-    long over1000 = results.stream().filter(r -> r.score() >= 1000).count();
+    long over1000 = results.stream().filter(r -> r.score() >= REQUIRED_SCORE).count();
     log.info(
         "Played {} game(s): min {}, avg {}, max {}; {} reached 1000+",
         scores.getCount(),

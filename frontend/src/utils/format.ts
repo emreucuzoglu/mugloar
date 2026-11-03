@@ -71,13 +71,15 @@ export function moveChanges(before: GameState, after: GameState): MoveChange[] {
   return changes
 }
 
-export const DEFAULT_TARGET = 1000
-export const MIN_TARGET = 1
-export const MAX_TARGET = 100_000
-export const TARGET_RANGE = `Pick a target between ${MIN_TARGET} and ${MAX_TARGET.toLocaleString('en')}.`
+export const NO_TARGET = 0
+export const TARGET_RANGE = 'Enter a whole number of points, or 0 to play until the dragon dies.'
 
 export function isValidTarget(value: number): boolean {
-  return Number.isInteger(value) && value >= MIN_TARGET && value <= MAX_TARGET
+  return Number.isSafeInteger(value) && value >= NO_TARGET
+}
+
+export function hasTarget(target: number): boolean {
+  return target > NO_TARGET
 }
 
 export function parseTarget(raw: string): { value: number } | { error: string } {

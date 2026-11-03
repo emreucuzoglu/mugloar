@@ -12,7 +12,15 @@ function hasFields(value: unknown, fields: Fields): value is Record<string, unkn
   return isRecord(value) && Object.entries(fields).every(([name, type]) => typeof value[name] === type)
 }
 
-const GAME_STATE: Fields = { gameId: 'string', lives: 'number', gold: 'number', level: 'number', score: 'number', turn: 'number' }
+const GAME_STATE: Fields = {
+  gameId: 'string',
+  lives: 'number',
+  gold: 'number',
+  level: 'number',
+  score: 'number',
+  highScore: 'number',
+  turn: 'number',
+}
 
 const QUEST: Fields = {
   questId: 'string',
@@ -23,8 +31,11 @@ const QUEST: Fields = {
   encrypted: 'boolean',
   questType: 'string',
   trap: 'boolean',
+  rank: 'number',
   recommended: 'boolean',
   successChance: 'number',
+  expectedValue: 'number',
+  acceptable: 'boolean',
 }
 
 const SHOP_ITEM: Fields = { id: 'string', name: 'string', cost: 'number', recommended: 'boolean' }

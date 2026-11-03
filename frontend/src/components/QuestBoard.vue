@@ -7,6 +7,7 @@ const props = defineProps<{
   quests: QuestView[]
   disabled: boolean
   over: boolean
+  autoplaying?: boolean
   loading?: boolean
   suggestedItem?: ShopItem | null
 }>()
@@ -44,6 +45,8 @@ watch(
   <section class="board" aria-labelledby="board-title">
     <h2 id="board-title" ref="title" class="board__title" tabindex="-1">Jobs on the board</h2>
     <p v-if="over" class="board__empty">The dragon is out of lives. Start a new game to take more jobs.</p>
+    <!-- The board isn't re-read during autoplay, so it would show jobs that have gone. -->
+    <p v-else-if="autoplaying" class="board__empty">The solver is choosing its own jobs. The board is back when it stops.</p>
     <template v-else>
       <!-- Repeated here because on a phone the shop is below all the jobs. -->
       <div v-if="suggestedItem" class="board__shop-first">

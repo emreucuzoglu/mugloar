@@ -50,7 +50,7 @@ class MugloarPropertiesTest {
         "mugloar.max-sessions=0",
         "mugloar.solver.games=0",
         "mugloar.solver.target-score=-1",
-        "mugloar.solver.max-moves=0",
+        "mugloar.solver.max-moves=-1",
         "mugloar.selector.min-chance-healthy=1.5",
         "mugloar.shopping.gold-reserve=-1",
       })

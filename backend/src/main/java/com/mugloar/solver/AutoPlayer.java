@@ -33,6 +33,7 @@ public final class AutoPlayer {
 
   public static final int MAX_CONSECUTIVE_FAILURES = 5;
   private static final int NO_TARGET = 0;
+  private static final int NO_MOVE_LIMIT = 0;
 
   @NonNull private final MugloarGateway gateway;
   @NonNull private final QuestSelector selector;
@@ -53,7 +54,7 @@ public final class AutoPlayer {
       if (targetScore > NO_TARGET && state.score() >= targetScore) {
         return new GameResult(state, moves, GameResult.StopReason.TARGET_REACHED);
       }
-      if (moves >= maxMoves) {
+      if (maxMoves > NO_MOVE_LIMIT && moves >= maxMoves) {
         return new GameResult(state, moves, GameResult.StopReason.MOVE_LIMIT);
       }
       if (failuresInARow >= MAX_CONSECUTIVE_FAILURES) {
@@ -98,20 +99,23 @@ public final class AutoPlayer {
       return events;
     }
     try {
-      Optional<ShopItem> item = shopping.nextPurchase(state, shop);
-      if (item.isPresent()) {
-        TurnEvent bought = purchase(state, item.get());
-        events.add(bought);
-        if (bought.success()) {
-          return events;
-        }
-        state = bought.state();
+      List<Quest> board = readBoard(state.gameId());
+      Optional<ShopItem> item = nextPurchase(state, shop, board);
+      if (item.isEmpty()) {
+        events.add(solveBest(state, board));
+        return events;
       }
-      events.add(solveBest(state));
+      TurnEvent bought = purchase(state, item.get());
+      events.add(bought);
+      if (bought.success()) {
+        return events;
+      }
+      events.add(solveBest(bought.state()));
     } catch (GameOverException e) {
       events.add(gameOver(state));
     } catch (MugloarApiException e) {
-      if (events.isEmpty()) {
+      // A refused purchase still cost a turn, so keep it, unless the server asks to stop.
+      if (events.isEmpty() || e.isRateLimited()) {
         throw e;
       }
       log.warn("Game server call failed after a refused purchase: {}", e.getMessage());
@@ -121,16 +125,23 @@ public final class AutoPlayer {
 
   /** A turn is one move: when the solver would shop, it recommends none of these quests. */
   public QuestBoard adviseQuests(GameState state, List<ShopItem> shop) {
-    List<QuestEvaluation> ranked = selector.rank(readBoard(state.gameId()), state);
+    List<Quest> board = readBoard(state.gameId());
+    List<QuestEvaluation> ranked = selector.rank(board, state);
     Optional<Quest> recommended =
-        shopping.nextPurchase(state, shop).isPresent()
+        nextPurchase(state, shop, board).isPresent()
             ? Optional.empty()
             : selector.best(ranked).map(QuestEvaluation::quest);
     return new QuestBoard(ranked, recommended);
   }
 
   public ShopOffer adviseShop(GameState state, List<ShopItem> shop) {
-    return new ShopOffer(shop, shopping.nextPurchase(state, shop));
+    return new ShopOffer(shop, nextPurchase(state, shop, readBoard(state.gameId())));
+  }
+
+  private Optional<ShopItem> nextPurchase(GameState state, List<ShopItem> shop, List<Quest> board) {
+    return state.purchaseUnconfirmed()
+        ? Optional.empty()
+        : shopping.nextPurchase(state, shop, board);
   }
 
   public List<Quest> readBoard(String gameId) {
@@ -138,7 +149,11 @@ public final class AutoPlayer {
   }
 
   TurnEvent solveBest(GameState state) {
-    Optional<QuestEvaluation> choice = selector.choose(readBoard(state.gameId()), state);
+    return solveBest(state, readBoard(state.gameId()));
+  }
+
+  private TurnEvent solveBest(GameState state, List<Quest> board) {
+    Optional<QuestEvaluation> choice = selector.choose(board, state);
     if (choice.isEmpty()) {
       return investigate(state);
     }
@@ -198,11 +213,17 @@ public final class AutoPlayer {
     try {
       result = gateway.buy(state.gameId(), item.id());
     } catch (MugloarApiException e) {
-      if (!e.isRefusal()) {
-        throw e;
+      if (e.isRefusal()) {
+        log.warn("Purchase of {} rejected: {}", LogSanitizer.clean(item.id()), e.getMessage());
+        return skip(state, "Could not buy " + item.name() + ": the game server refused it");
       }
-      log.warn("Purchase of {} rejected: {}", LogSanitizer.clean(item.id()), e.getMessage());
-      return skip(state, "Could not buy " + item.name() + ": the game server refused it");
+      if (e.isTransient()) {
+        log.warn("No answer on buying {}: {}", LogSanitizer.clean(item.id()), e.getMessage());
+        return skip(
+            state.afterPossiblePurchase(item.id()),
+            "No answer on buying " + item.name() + ": the move may have counted");
+      }
+      throw e;
     }
     GameState next =
         result.shoppingSuccess() ? state.after(result).afterBuying(item.id()) : state.after(result);

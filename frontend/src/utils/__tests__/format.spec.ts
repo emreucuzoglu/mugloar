@@ -30,18 +30,17 @@ describe('plural', () => {
 })
 
 describe('parseTarget', () => {
-  it('accepts whole numbers in range', () => {
+  it('accepts whole numbers with no upper limit, and 0 for no target', () => {
     expect(parseTarget(' 1000 ')).toEqual({ value: 1000 })
-    expect(parseTarget('1')).toEqual({ value: 1 })
-    expect(parseTarget('100000')).toEqual({ value: 100000 })
+    expect(parseTarget('0')).toEqual({ value: 0 })
+    expect(parseTarget('1000000000')).toEqual({ value: 1_000_000_000 })
   })
 
   it.each(['', '   ', 'abc', '12.5', '-5', '1e3'])('rejects %j', (raw) => {
     expect(parseTarget(raw)).toHaveProperty('error')
   })
 
-  it('rejects out-of-range numbers', () => {
-    expect(parseTarget('0')).toHaveProperty('error')
-    expect(parseTarget('100001')).toHaveProperty('error')
+  it('rejects numbers too large to count exactly', () => {
+    expect(parseTarget('9007199254740992')).toHaveProperty('error')
   })
 })

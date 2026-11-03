@@ -139,6 +139,27 @@ describe('game store', () => {
     expect(store.autoplaying).toBe(false)
   })
 
+  it('autoplays without a target until the dragon dies, however high the score', async () => {
+    let turn = 0
+    api = fakeApi({
+      autoplayStep: vi.fn(async () => {
+        turn++
+        return [solved(turn * 100_000, turn, turn < 3 ? 3 : 0)]
+      }),
+    })
+    setApi(api)
+    const store = useGameStore()
+    await store.startGame()
+
+    await store.autoplay(0)
+
+    expect(api.autoplayStep).toHaveBeenCalledTimes(3)
+    expect(store.game?.score).toBe(300_000)
+    expect(store.isOver).toBe(true)
+    expect(store.reachedTarget).toBe(false)
+    expect(store.progress).toBe(0)
+  })
+
   it('autoplay stops when the dragon dies', async () => {
     api = fakeApi({ autoplayStep: vi.fn().mockResolvedValue([solved(10, 1, 0)]) })
     setApi(api)
@@ -197,13 +218,13 @@ describe('game store', () => {
     expect(store.autoplaying).toBe(false)
   })
 
-  it.each([0, -5, 1.5, 100_001, Number.NaN])('rejects autoplay target %s', async (bad) => {
+  it.each([-5, 1.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN])('rejects autoplay target %s', async (bad) => {
     const store = useGameStore()
     await store.startGame()
 
     await store.autoplay(bad)
 
-    expect(store.error).toMatch(/Pick a target/)
+    expect(store.error).toMatch(/whole number of points/)
     expect(api.autoplayStep).not.toHaveBeenCalled()
   })
 
@@ -372,7 +393,7 @@ describe('game store', () => {
 
     await store.resume()
 
-    expect(store.target).toBe(1000)
+    expect(store.target).toBe(0)
   })
 
   it('forgets the saved target along with the game', async () => {
@@ -658,9 +679,10 @@ describe('game store', () => {
     expect(store.game?.score).toBe(10)
   })
 
-  it('autoplay stops but keeps the move when the refresh after it fails', async () => {
+  it('autoplay keeps its moves when the refresh after it fails', async () => {
+    let turn = 0
     api = fakeApi({
-      autoplayStep: vi.fn().mockResolvedValue([solved(10, 1)]),
+      autoplayStep: vi.fn(async () => [solved(++turn * 600, turn)]),
       getQuests: vi.fn().mockResolvedValueOnce([quest]).mockRejectedValue(new ApiError(502, 'Down')),
     })
     setApi(api)
@@ -669,11 +691,44 @@ describe('game store', () => {
 
     await store.autoplay(1000)
 
-    expect(api.autoplayStep).toHaveBeenCalledTimes(1)
-    expect(store.game?.score).toBe(10)
-    expect(store.log).toHaveLength(1)
+    expect(api.autoplayStep).toHaveBeenCalledTimes(2)
+    expect(store.game?.score).toBe(1200)
+    expect(store.log).toHaveLength(2)
     expect(store.error).toBe('Down')
     expect(store.autoplaying).toBe(false)
+  })
+
+  it('autoplay reads the board and shop once it ends, not every turn', async () => {
+    let turn = 0
+    api = fakeApi({ autoplayStep: vi.fn(async () => [solved(++turn * 400, turn)]) })
+    setApi(api)
+    const store = useGameStore()
+    await store.startGame()
+
+    await store.autoplay(1000)
+
+    expect(api.autoplayStep).toHaveBeenCalledTimes(3)
+    expect(api.getQuests).toHaveBeenCalledTimes(2)
+    expect(api.getShop).toHaveBeenCalledTimes(2)
+  })
+
+  it('autoplay suggests no purchase while it runs, as the shop is not re-read', async () => {
+    let finish: (events: TurnEvent[]) => void = () => {}
+    api = fakeApi({
+      getShop: vi.fn().mockResolvedValue([{ id: 'hpot', name: 'Healing potion', cost: 50, recommended: true }]),
+      autoplayStep: vi.fn(() => new Promise<TurnEvent[]>((r) => (finish = r))),
+    })
+    setApi(api)
+    const store = useGameStore()
+    await store.startGame()
+    expect(store.suggestedItem?.id).toBe('hpot')
+
+    const running = store.autoplay(10)
+    expect(store.suggestedItem).toBeNull()
+    finish([solved(10, 1)])
+    await running
+
+    expect(store.suggestedItem?.id).toBe('hpot')
   })
 
   it('autoplay stops and catches up when the server refuses to continue', async () => {
@@ -722,26 +777,44 @@ describe('game store', () => {
     expect(store.autoplaying).toBe(false)
   })
 
-  it('a stop pressed during a refresh takes effect before the next step', async () => {
-    let finishRefresh: (quests: QuestView[]) => void = () => {}
-    const getQuests = vi
-      .fn()
-      .mockResolvedValueOnce([quest])
-      .mockImplementationOnce(() => new Promise<QuestView[]>((r) => (finishRefresh = r)))
-    api = fakeApi({ getQuests, autoplayStep: vi.fn().mockResolvedValue([solved(10, 1)]) })
+  it('a stop pressed during a step takes effect before the next step, and the board comes back', async () => {
+    let finish: (events: TurnEvent[]) => void = () => {}
+    api = fakeApi({ autoplayStep: vi.fn(() => new Promise<TurnEvent[]>((r) => (finish = r))) })
     setApi(api)
     const store = useGameStore()
     await store.startGame()
 
     const running = store.autoplay(1000)
-    await vi.waitFor(() => expect(getQuests).toHaveBeenCalledTimes(2))
     store.stopAutoplay()
-    finishRefresh([quest])
+    finish([solved(10, 1)])
     await running
 
     expect(api.autoplayStep).toHaveBeenCalledTimes(1)
+    expect(api.getQuests).toHaveBeenCalledTimes(2)
+    expect(store.quests).toEqual([quest])
     expect(store.autoplaying).toBe(false)
     expect(store.stopRequested).toBe(false)
+  })
+
+  it('catches up after a 410, but keeps the game over whatever the server state says', async () => {
+    const last = solved(300, 7)
+    api = fakeApi({
+      autoplayStep: vi.fn().mockRejectedValue(new ApiError(410, 'Game over')),
+      getGame: vi.fn().mockResolvedValue(last.state),
+      getHistory: vi.fn().mockResolvedValue([last]),
+    })
+    setApi(api)
+    const store = useGameStore()
+    await store.startGame()
+
+    await store.step()
+
+    expect(store.isOver).toBe(true)
+    expect(store.game?.score).toBe(300)
+    expect(store.game?.turn).toBe(7)
+    expect(store.log.map((e) => e.state.turn)).toEqual([7])
+    expect(store.quests).toEqual([])
+    expect(store.error).toBe('Game over')
   })
 
   it('keeps the current game when starting a new one fails', async () => {

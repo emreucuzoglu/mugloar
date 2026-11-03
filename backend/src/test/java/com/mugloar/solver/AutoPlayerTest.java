@@ -6,6 +6,7 @@ import static com.mugloar.testsupport.Fixtures.POTION;
 import static com.mugloar.testsupport.Fixtures.PURCHASE_RESULT_DTO;
 import static com.mugloar.testsupport.Fixtures.QUEST;
 import static com.mugloar.testsupport.Fixtures.QUEST_DTO;
+import static com.mugloar.testsupport.Fixtures.QUEST_SELECTOR;
 import static com.mugloar.testsupport.Fixtures.REJECTED;
 import static com.mugloar.testsupport.Fixtures.REPUTATION_DTO;
 import static com.mugloar.testsupport.Fixtures.SERVER_DOWN;
@@ -16,12 +17,14 @@ import static com.mugloar.testsupport.Fixtures.aPurchaseResultDto;
 import static com.mugloar.testsupport.Fixtures.aQuest;
 import static com.mugloar.testsupport.Fixtures.aQuestDto;
 import static com.mugloar.testsupport.Fixtures.aReputationDto;
+import static com.mugloar.testsupport.Fixtures.aShoppingSettings;
 import static com.mugloar.testsupport.Fixtures.aSolveResultDto;
 import static com.mugloar.testsupport.Fixtures.autoPlayer;
 import static com.mugloar.testsupport.Fixtures.b64;
 import static com.mugloar.testsupport.Fixtures.gateway;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 import static org.assertj.core.api.Assertions.withinPercentage;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -39,8 +42,10 @@ import com.mugloar.domain.ShopItem;
 import com.mugloar.gateway.GameOverException;
 import com.mugloar.gateway.MugloarApiException;
 import com.mugloar.gateway.client.MugloarClient;
+import com.mugloar.solver.strategy.BalancedShoppingStrategy;
 import com.mugloar.testsupport.SimulatedMugloarClient;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.IntSummaryStatistics;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -51,9 +56,21 @@ import org.junit.jupiter.params.provider.ValueSource;
 class AutoPlayerTest {
 
   private static final MugloarApiException RATE_LIMITED = new MugloarApiException(429, "slow down");
-  private static final double LIVE_AVERAGE_SCORE = 7795;
-  private static final double LIVE_AVERAGE_MOVES = 164;
-  private static final double LIVE_AVERAGE_LEVEL = 36;
+  private static final int MOVE_LIMIT = 2000;
+  private static final int SURE_THINGS_TO_HARVEST = 7;
+
+  /** From 30 live games of this solver until death or the move limit: 8 reached it, 22 died. */
+  private static final double LIVE_SHARE_REACHING_THE_MOVE_LIMIT = 0.27;
+
+  private static final double SHARE_TOLERANCE = 0.15;
+  private static final double LIVE_AVERAGE_SCORE_OF_DEATHS = 11039;
+  private static final double LIVE_AVERAGE_MOVES_OF_DEATHS = 128;
+
+  /** The 8 games at the limit: 30 games averaged 159,794, less the 22 deaths at 11,039. */
+  private static final double LIVE_AVERAGE_SCORE_AT_THE_MOVE_LIMIT = 568_870;
+
+  private static final double LOST_REPLY_RATE = 0.05;
+  private static final int LOST_REPLY_GAMES = 30;
   private static final double CALIBRATION_PERCENT = 25;
   private static final double SERVER_ERROR_RATE = 0.02;
   private static final double REACHES_TARGET_THROUGH_ERRORS = 0.85;
@@ -250,7 +267,33 @@ class AutoPlayerTest {
     when(client.buy("g1", "hpot")).thenThrow(RATE_LIMITED);
 
     assertThatThrownBy(() -> player.playTurn(wounded, SHOP_ITEMS)).isSameAs(RATE_LIMITED);
-    verify(client, never()).getMessages("g1");
+    verify(client, never()).solve(anyString(), anyString());
+  }
+
+  @Test
+  void takesAJobInsteadOfAnUpgradeWhileTheBoardIsFullOfSureThings() {
+    GameState rich = aGameState().gold(1000).build();
+    when(client.getMessages("g1"))
+        .thenReturn(Collections.nCopies(SURE_THINGS_TO_HARVEST, QUEST_DTO));
+    when(client.solve("g1", "a")).thenReturn(SOLVE_RESULT_DTO);
+
+    List<TurnEvent> events = player.playTurn(rich, SHOP_ITEMS);
+
+    assertThat(events).extracting(TurnEvent::type).containsExactly(TurnEvent.Type.SOLVE);
+    assertThat(player.adviseShop(rich, SHOP_ITEMS).recommended()).isEmpty();
+    verify(client, never()).buy(anyString(), anyString());
+  }
+
+  @Test
+  void buysTheUpgradeWhenTooFewJobsAreSureThings() {
+    GameState rich = aGameState().gold(1000).build();
+    when(client.getMessages("g1")).thenReturn(List.of(QUEST_DTO));
+    when(client.buy("g1", "ch")).thenReturn(PURCHASE_RESULT_DTO);
+
+    List<TurnEvent> events = player.playTurn(rich, SHOP_ITEMS);
+
+    assertThat(events).extracting(TurnEvent::type).containsExactly(TurnEvent.Type.PURCHASE);
+    verify(client, never()).solve(anyString(), anyString());
   }
 
   @Test
@@ -397,6 +440,25 @@ class AutoPlayerTest {
 
     assertThat(result.reason()).isEqualTo(GameResult.StopReason.MOVE_LIMIT);
     assertThat(result.moves()).isEqualTo(5);
+  }
+
+  @Test
+  void zeroMoveLimitPlaysUntilDeath() {
+    long seed = 100;
+    while (play(seed, MOVE_LIMIT).reason() != GameResult.StopReason.GAME_OVER) {
+      seed++;
+    }
+
+    GameResult limited = play(seed, MOVE_LIMIT);
+    GameResult unlimited = play(seed, 0);
+
+    assertThat(unlimited.reason()).isEqualTo(GameResult.StopReason.GAME_OVER);
+    assertThat(unlimited.moves()).isEqualTo(limited.moves());
+  }
+
+  private GameResult play(long seed, int maxMoves) {
+    SimulatedMugloarClient sim = new SimulatedMugloarClient(seed);
+    return autoPlayer(sim).play(gateway(sim).startGame(), 0, maxMoves, null);
   }
 
   @Test
@@ -661,12 +723,17 @@ class AutoPlayerTest {
   }
 
   @Test
-  void serverErrorOnPurchaseIsNotSwallowed() {
+  void unansweredPurchaseBecomesASkipThatKeepsTheKnownGoldAndLives() {
+    GameState wounded = aGameState().lives(2).gold(120).turn(10).build();
     when(client.buy("g1", "hpot")).thenThrow(SERVER_DOWN);
 
-    assertThatThrownBy(() -> player.purchase(GAME_STATE, POTION))
-        .isInstanceOf(MugloarApiException.class)
-        .hasMessage("down");
+    TurnEvent event = player.purchase(wounded, POTION);
+
+    assertThat(event.type()).isEqualTo(TurnEvent.Type.SKIP);
+    assertThat(event.message()).contains("may have counted");
+    assertThat(event.state().gold()).isEqualTo(120);
+    assertThat(event.state().lives()).isEqualTo(2);
+    assertThat(event.state().purchaseUnconfirmed()).isTrue();
   }
 
   @Test
@@ -705,7 +772,7 @@ class AutoPlayerTest {
     GameState wounded = aGameState().lives(2).gold(60).score(100).highScore(100).turn(10).build();
     when(client.buy("g1", "hpot"))
         .thenReturn(aPurchaseResultDto().shoppingSuccess(false).gold(60).lives(2).turn(11).build());
-    when(client.getMessages("g1")).thenThrow(SERVER_DOWN);
+    when(client.getMessages("g1")).thenReturn(List.of(QUEST_DTO)).thenThrow(SERVER_DOWN);
 
     List<TurnEvent> events = player.playTurn(wounded, SHOP_ITEMS);
 
@@ -718,18 +785,63 @@ class AutoPlayerTest {
   }
 
   @Test
-  void unansweredPurchaseIsCorrectedByTheNextPurchaseResponse() {
+  void rateLimitAfterARefusedPurchaseStillStopsTheGame() {
+    GameState wounded = aGameState().lives(2).gold(60).score(100).highScore(100).turn(10).build();
+    when(client.getShop("g1")).thenReturn(SimulatedMugloarClient.SHOP);
+    when(client.buy("g1", "hpot"))
+        .thenReturn(aPurchaseResultDto().shoppingSuccess(false).gold(60).lives(2).turn(11).build());
+    when(client.getMessages("g1")).thenThrow(RATE_LIMITED);
+
+    GameResult result = player.play(wounded, 0, 100, null);
+
+    assertThat(result.reason()).isEqualTo(GameResult.StopReason.RATE_LIMITED);
+  }
+
+  @Test
+  void unansweredPurchaseIsNotSentAgainUntilAResponseCorrectsTheState() {
     GameState wounded = aGameState().lives(2).gold(120).turn(10).build();
     when(client.buy("g1", "hpot"))
         .thenThrow(SERVER_DOWN)
-        .thenReturn(aPurchaseResultDto().gold(20).lives(4).level(0).turn(12).build());
+        .thenReturn(aPurchaseResultDto().gold(20).lives(3).turn(13).build());
+    when(client.getMessages("g1")).thenReturn(List.of(QUEST_DTO));
+    when(client.solve("g1", "a"))
+        .thenThrow(SERVER_DOWN)
+        .thenReturn(aSolveResultDto().lives(2).gold(70).turn(12).build());
 
-    assertThatThrownBy(() -> player.purchase(wounded, POTION)).isSameAs(SERVER_DOWN);
-    GameState next = player.purchase(wounded, POTION).state();
+    List<TurnEvent> first = player.playTurn(wounded, SHOP_ITEMS);
+    GameState unconfirmed = first.getLast().state();
+    assertThat(first).extracting(TurnEvent::type).containsOnly(TurnEvent.Type.SKIP);
 
-    assertThat(next.gold()).isEqualTo(20);
-    assertThat(next.lives()).isEqualTo(4);
-    assertThat(next.turn()).isEqualTo(12);
+    GameState corrected = player.playTurn(unconfirmed, SHOP_ITEMS).getLast().state();
+    verify(client, times(1)).buy("g1", "hpot");
+    assertThat(corrected.gold()).isEqualTo(70);
+    assertThat(corrected.purchaseUnconfirmed()).isFalse();
+
+    player.playTurn(corrected, SHOP_ITEMS);
+    verify(client, times(2)).buy("g1", "hpot");
+  }
+
+  @Test
+  void unansweredPurchaseMovesTheRotationOnInCaseItCounted() {
+    GameState unconfirmed = aGameState().gold(1000).build().afterPossiblePurchase("ch");
+    when(client.getMessages("g1")).thenReturn(List.of(QUEST_DTO));
+    when(client.solve("g1", "a")).thenReturn(aSolveResultDto().gold(1000).turn(1).build());
+    when(client.buy("g1", "iron")).thenReturn(aPurchaseResultDto().gold(700).turn(2).build());
+
+    GameState corrected = player.playTurn(unconfirmed, SHOP_ITEMS).getLast().state();
+    player.playTurn(corrected, SHOP_ITEMS);
+
+    verify(client, never()).buy("g1", "ch");
+    verify(client).buy("g1", "iron");
+  }
+
+  @Test
+  void recommendsNoPurchaseWhileOneIsUnconfirmed() {
+    GameState unconfirmed = aGameState().lives(2).gold(120).build().afterPossiblePurchase("hpot");
+    when(client.getMessages("g1")).thenReturn(List.of(QUEST_DTO));
+
+    assertThat(player.adviseShop(unconfirmed, SHOP_ITEMS).recommended()).isEmpty();
+    assertThat(player.adviseQuests(unconfirmed, SHOP_ITEMS).recommended()).isPresent();
   }
 
   @Test
@@ -737,37 +849,56 @@ class AutoPlayerTest {
     for (long seed = 100; seed < 150; seed++) {
       SimulatedMugloarClient sim = new SimulatedMugloarClient(seed);
 
-      GameResult result = autoPlayer(sim).play(gateway(sim).startGame(), 0, 2000, null);
+      GameResult result = autoPlayer(sim).play(gateway(sim).startGame(), 0, MOVE_LIMIT, null);
 
-      assertThat(result.reason()).as("seed %d", seed).isEqualTo(GameResult.StopReason.GAME_OVER);
+      assertThat(result.reason())
+          .as("seed %d", seed)
+          .isIn(GameResult.StopReason.GAME_OVER, GameResult.StopReason.MOVE_LIMIT);
       assertThat(sim.avoidableTraps).as("seed %d", seed).isZero();
       assertThat(sim.callsAfterGameOver).as("seed %d", seed).isZero();
     }
   }
 
+  /**
+   * Games either fall behind and die, or keep up and reach the move limit, so each is compared. The
+   * live figures come from the solver before harvesting, so the simulated one buys the same way.
+   */
   @Test
   void simulatedGamesUntilDeathResembleTheLiveGame() {
     int games = 100;
-    IntSummaryStatistics scores = new IntSummaryStatistics();
-    IntSummaryStatistics moves = new IntSummaryStatistics();
-    IntSummaryStatistics levels = new IntSummaryStatistics();
+    int reachedTheLimit = 0;
+    IntSummaryStatistics deathScores = new IntSummaryStatistics();
+    IntSummaryStatistics deathMoves = new IntSummaryStatistics();
+    IntSummaryStatistics limitScores = new IntSummaryStatistics();
     for (long seed = 100; seed < 100 + games; seed++) {
       SimulatedMugloarClient sim = new SimulatedMugloarClient(seed);
-      GameResult r = autoPlayer(sim).play(gateway(sim).startGame(), 0, 2000, null);
-      scores.accept(r.score());
-      moves.accept(r.moves());
-      levels.accept(r.finalState().level());
+      AutoPlayer alwaysBuys =
+          new AutoPlayer(
+              gateway(sim),
+              QUEST_SELECTOR,
+              new BalancedShoppingStrategy(aShoppingSettings().harvestAtSureThings(0).build()));
+      GameResult r = alwaysBuys.play(gateway(sim).startGame(), 0, MOVE_LIMIT, null);
+      if (r.reason() == GameResult.StopReason.MOVE_LIMIT) {
+        reachedTheLimit++;
+        limitScores.accept(r.score());
+      } else {
+        deathScores.accept(r.score());
+        deathMoves.accept(r.moves());
+      }
     }
 
-    assertThat(scores.getAverage())
-        .as("simulated score %s, moves %s, level %s", scores, moves, levels)
-        .isCloseTo(LIVE_AVERAGE_SCORE, withinPercentage(CALIBRATION_PERCENT));
-    assertThat(moves.getAverage())
-        .as("moves %s", moves)
-        .isCloseTo(LIVE_AVERAGE_MOVES, withinPercentage(CALIBRATION_PERCENT));
-    assertThat(levels.getAverage())
-        .as("level %s", levels)
-        .isCloseTo(LIVE_AVERAGE_LEVEL, withinPercentage(CALIBRATION_PERCENT));
+    assertThat((double) reachedTheLimit / games)
+        .as("share reaching the move limit; deaths: score %s, moves %s", deathScores, deathMoves)
+        .isCloseTo(LIVE_SHARE_REACHING_THE_MOVE_LIMIT, within(SHARE_TOLERANCE));
+    assertThat(deathScores.getAverage())
+        .as("score of deaths %s", deathScores)
+        .isCloseTo(LIVE_AVERAGE_SCORE_OF_DEATHS, withinPercentage(CALIBRATION_PERCENT));
+    assertThat(deathMoves.getAverage())
+        .as("moves of deaths %s", deathMoves)
+        .isCloseTo(LIVE_AVERAGE_MOVES_OF_DEATHS, withinPercentage(CALIBRATION_PERCENT));
+    assertThat(limitScores.getAverage())
+        .as("score of games reaching the move limit %s", limitScores)
+        .isCloseTo(LIVE_AVERAGE_SCORE_AT_THE_MOVE_LIMIT, withinPercentage(CALIBRATION_PERCENT));
   }
 
   @Test
@@ -815,6 +946,46 @@ class AutoPlayerTest {
       }
     }
     assertThat(sim100PercentFloor(games)).isLessThanOrEqualTo(reached);
+  }
+
+  /**
+   * The server makes the move but its answer is lost. The solver must not spend gold it may no
+   * longer have, nor buy the same +2 item again, and every answer it gets must put it back in step.
+   */
+  @Test
+  void movesThatCountWithoutAnAnswerLeaveNoRefusalAndAnEvenRotation() {
+    int lostReplies = 0;
+    for (long seed = 100; seed < 100 + LOST_REPLY_GAMES; seed++) {
+      SimulatedMugloarClient sim = new SimulatedMugloarClient(seed, 0, LOST_REPLY_RATE);
+      long thisSeed = seed;
+
+      autoPlayer(sim)
+          .play(
+              gateway(sim).startGame(),
+              0,
+              MOVE_LIMIT,
+              event -> {
+                if (event.type() == TurnEvent.Type.SOLVE
+                    || event.type() == TurnEvent.Type.PURCHASE) {
+                  GameState known = event.state();
+                  String where = "seed " + thisSeed + " turn " + known.turn();
+                  assertThat(known.gold()).as(where).isEqualTo(sim.gold());
+                  assertThat(known.lives()).as(where).isEqualTo(sim.lives());
+                  assertThat(known.turn()).as(where).isEqualTo(sim.turn());
+                }
+                if (event.type() == TurnEvent.Type.PURCHASE) {
+                  assertThat(event.state().level()).as("seed %d", thisSeed).isEqualTo(sim.level());
+                }
+              });
+
+      assertThat(sim.refusedPurchases).as("seed %d", seed).isZero();
+      assertThat(sim.bigItemSpread()).as("seed %d", seed).isLessThanOrEqualTo(1);
+      assertThat(sim.avoidableTraps).as("seed %d", seed).isZero();
+      lostReplies += sim.lostReplies;
+    }
+    assertThat(lostReplies)
+        .as("the fault has to happen for the test to mean anything")
+        .isPositive();
   }
 
   @Test

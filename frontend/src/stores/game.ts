@@ -1,7 +1,15 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { ApiError, getApi, type QuestView, type GameState, type ShopItem, type TurnEvent } from '../api'
-import { DEFAULT_TARGET, isValidTarget, moveChanges, parseTarget, TARGET_RANGE, type MoveChange } from '../utils/format'
+import {
+  hasTarget,
+  isValidTarget,
+  moveChanges,
+  NO_TARGET,
+  parseTarget,
+  TARGET_RANGE,
+  type MoveChange,
+} from '../utils/format'
 
 const GAME_KEY = 'mugloar.gameId'
 const TARGET_KEY = 'mugloar.target'
@@ -48,14 +56,21 @@ export const useGameStore = defineStore('game', () => {
   const refreshing = ref(false)
   const autoplaying = ref(false)
   const stopRequested = ref(false)
-  const target = ref(DEFAULT_TARGET)
+  const target = ref(NO_TARGET)
   const error = ref<string | null>(null)
 
   const isOver = computed(() => game.value !== null && game.value.lives <= 0)
   const canAct = computed(() => game.value !== null && !isOver.value && !busy.value && !autoplaying.value)
-  const progress = computed(() => (game.value ? Math.min(1, game.value.score / target.value) : 0))
-  const reachedTarget = computed(() => game.value !== null && game.value.score >= target.value)
-  const suggestedItem = computed(() => (isOver.value ? null : (shop.value.find((i) => i.recommended) ?? null)))
+  const progress = computed(() =>
+    game.value && hasTarget(target.value) ? Math.min(1, game.value.score / target.value) : 0,
+  )
+  const reachedTarget = computed(
+    () => game.value !== null && hasTarget(target.value) && game.value.score >= target.value,
+  )
+  // The shop isn't re-read during autoplay, so its pick would be stale.
+  const suggestedItem = computed(() =>
+    isOver.value || autoplaying.value ? null : (shop.value.find((i) => i.recommended) ?? null),
+  )
   const loading = computed(() => resuming.value || refreshing.value)
 
   function logged(events: TurnEvent[]): LoggedEvent[] {
@@ -116,11 +131,12 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  async function resync(gameId: string) {
+  /** After a conflict, a lost response or a 410, reloads what the server has. A 410 keeps the game over. */
+  async function resync(gameId: string, gone: boolean) {
     try {
       const api = getApi()
       const [state, history] = await Promise.all([api.getGame(gameId), api.getHistory(gameId)])
-      game.value = state
+      game.value = gone ? { ...state, lives: 0 } : state
       log.value = logged(history).slice(0, LOG_LIMIT)
       lastMove.value = null
       if (isOver.value) {
@@ -132,8 +148,10 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function needsResync(e: unknown): boolean {
-    return e instanceof ApiError && (e.isConflict || e.isNoResponse)
+  async function resyncAfter(e: unknown, gameId: string) {
+    if (e instanceof ApiError && (e.isConflict || e.isNoResponse || e.isGameOver)) {
+      await resync(gameId, e.isGameOver)
+    }
   }
 
   async function loadBoard() {
@@ -185,8 +203,11 @@ export const useGameStore = defineStore('game', () => {
     }
     try {
       const api = getApi()
+      // Both requests start at once, but the game is shown even if its history can't be read.
+      const historyRead = api.getHistory(id)
+      historyRead.catch(() => {})
       game.value = await api.getGame(id)
-      log.value = logged(await api.getHistory(id)).slice(0, LOG_LIMIT)
+      log.value = logged(await historyRead).slice(0, LOG_LIMIT)
       await refresh()
     } catch (e) {
       if (e instanceof ApiError && e.isNotFound) {
@@ -227,9 +248,7 @@ export const useGameStore = defineStore('game', () => {
       await refresh()
     } catch (e) {
       handleError(e)
-      if (needsResync(e)) {
-        await resync(gameId)
-      }
+      await resyncAfter(e, gameId)
     } finally {
       busy.value = false
     }
@@ -245,7 +264,7 @@ export const useGameStore = defineStore('game', () => {
       error.value = TARGET_RANGE
       return
     }
-    if (!canAct.value || !game.value){
+    if (!canAct.value || !game.value) {
       return
     }
     const gameId = game.value.gameId
@@ -255,19 +274,23 @@ export const useGameStore = defineStore('game', () => {
     stopRequested.value = false
     clearError()
     try {
-      while (!stopRequested.value && game.value && !isOver.value && game.value.score < targetScore) {
+      while (
+        !stopRequested.value &&
+        game.value &&
+        !isOver.value &&
+        (!hasTarget(targetScore) || game.value.score < targetScore)
+      ) {
         const events = await getApi().autoplayStep(game.value.gameId)
-        if (events.length === 0){
+        if (events.length === 0) {
           break
         }
+        // The board isn't re-read each turn: that would cost the public game server a request per turn.
         apply(events)
-        await refresh()
       }
+      await refresh()
     } catch (e) {
       handleError(e)
-      if (needsResync(e)) {
-        await resync(gameId)
-      }
+      await resyncAfter(e, gameId)
     } finally {
       autoplaying.value = false
       stopRequested.value = false

@@ -7,10 +7,14 @@ const props = defineProps<{
   gold: number
   disabled: boolean
   over?: boolean
+  autoplaying?: boolean
   hasGame?: boolean
   loading?: boolean
 }>()
 const emit = defineEmits<{ buy: [itemId: string] }>()
+
+// The shop isn't re-read during autoplay, so its pick would be stale.
+const showPick = (item: ShopItem) => item.recommended && !props.over && !props.autoplaying
 
 const emptyMessage = computed(() => {
   if (props.loading) {
@@ -30,17 +34,17 @@ const emptyMessage = computed(() => {
         v-for="item in items"
         :key="item.id"
         class="shop__item"
-        :class="{ 'shop__item--pick': item.recommended && !over }"
+        :class="{ 'shop__item--pick': showPick(item) }"
       >
         <span class="shop__name">
           {{ item.name }}
-          <span v-if="item.recommended && !over" class="shop__pick">Solver's pick</span>
+          <span v-if="showPick(item)" class="shop__pick">Solver's pick</span>
           <span v-if="item.cost > gold && !over" class="shop__short">Need {{ item.cost - gold }} more gold</span>
         </span>
         <button
           type="button"
           class="btn shop__buy"
-          :class="{ 'btn--primary': item.recommended && !over, 'btn--short': item.cost > gold }"
+          :class="{ 'btn--primary': showPick(item), 'btn--short': item.cost > gold }"
           :disabled="disabled || item.cost > gold"
           :aria-label="`Buy ${item.name} for ${item.cost} gold`"
           @click="emit('buy', item.id)"

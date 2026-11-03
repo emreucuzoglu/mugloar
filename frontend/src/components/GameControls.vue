@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { formatNumber, MAX_TARGET, MIN_TARGET, parseTarget } from '../utils/format'
+import { formatNumber, hasTarget, parseTarget } from '../utils/format'
 
 const props = defineProps<{
   hasGame: boolean
@@ -68,7 +68,7 @@ function submitAutoplay() {
     lastClicked = null
     return
   }
-  if (parsed.value.value <= props.score) {
+  if (hasTarget(parsed.value.value) && parsed.value.value <= props.score) {
     alreadyReached.value = props.score
     lastClicked = null
     return
@@ -135,7 +135,7 @@ watch(
         >
           {{ autoplaying ? (stopping ? 'Stopping…' : 'Stop') : 'Autoplay' }}
         </button>
-        <p id="target-hint" class="visually-hidden">Autoplay targets range from {{ MIN_TARGET }} to {{ MAX_TARGET }}.</p>
+        <p id="target-hint" class="controls__hint">0 plays until the dragon dies.</p>
         <p v-if="targetError" id="target-error" class="controls__error" role="alert">{{ targetError }}</p>
       </form>
     </template>
@@ -187,10 +187,18 @@ watch(
   border: 2px solid var(--ember-deep);
 }
 
+.controls__hint,
 .controls__error {
   flex-basis: 100%;
   margin: 0;
   font-size: var(--step--1);
+}
+
+.controls__hint {
+  color: var(--ink-soft);
+}
+
+.controls__error {
   color: var(--ember-deep);
 }
 

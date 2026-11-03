@@ -30,8 +30,8 @@ mugloar:
     gold-reserve: 50
     # 0 means +1 level items are never bought; raise it to allow them before that turn.
     small-upgrades-until-turn: 0
-    upgrades-until-turn: 70
+    harvest-at-sure-things: 7
   solver:
     games: 1
     target-score: 0
-    max-moves: 2000
+    max-moves: 0

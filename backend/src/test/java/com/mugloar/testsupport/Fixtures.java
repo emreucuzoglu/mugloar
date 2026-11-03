@@ -318,11 +318,11 @@ public final class Fixtures {
     private int healBelowLives = 3;
     private int goldReserve = 50;
     private int smallUpgradesUntilTurn;
-    private int upgradesUntilTurn = 70;
+    private int harvestAtSureThings = 7;
 
     public ShoppingSettings build() {
       return new ShoppingSettings(
-          healBelowLives, goldReserve, smallUpgradesUntilTurn, upgradesUntilTurn);
+          healBelowLives, goldReserve, smallUpgradesUntilTurn, harvestAtSureThings);
     }
   }
 }

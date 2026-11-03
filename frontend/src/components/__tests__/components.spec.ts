@@ -118,6 +118,12 @@ describe('QuestBoard', () => {
     expect(wrapper.findAll('article')).toHaveLength(0)
   })
 
+  it('hides the jobs during autoplay, as they are not re-read until it stops', () => {
+    const wrapper = mount(QuestBoard, { props: { quests: [quest], disabled: true, over: false, autoplaying: true } })
+    expect(wrapper.text()).toContain('The solver is choosing its own jobs')
+    expect(wrapper.findAll('article')).toHaveLength(0)
+  })
+
   it('passes take events up', async () => {
     const wrapper = mount(QuestBoard, { props: { quests: [quest], disabled: false, over: false } })
     await wrapper.get('article button').trigger('click')
@@ -248,6 +254,14 @@ describe('ShopPanel', () => {
     expect(wrapper.get('.shop__item--pick').text()).toContain("Solver's pick")
   })
 
+  it('highlights nothing during autoplay, as the shop is not re-read until it stops', () => {
+    const picked = [{ ...items[0], recommended: true }]
+    const wrapper = mount(ShopPanel, { props: { items: picked, gold: 500, disabled: true, autoplaying: true } })
+
+    expect(wrapper.find('.shop__item--pick').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain("Solver's pick")
+  })
+
   it('highlights nothing once the game is over', () => {
     const picked = [{ ...items[0], recommended: true }]
     const wrapper = mount(ShopPanel, { props: { items: picked, gold: 500, disabled: true, over: true } })
@@ -331,7 +345,15 @@ describe('StatsBar', () => {
     const wrapper = mount(StatsBar, { props: { game, target: 1000, progress: 1 } })
 
     expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('1000')
-    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('Score 1500 of 1000')
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('Score 1,500 of 1,000')
+  })
+
+  it('shows only the score when there is no target', () => {
+    const game = { gameId: 'g1', lives: 3, gold: 75, level: 3, score: 584_376, highScore: 584_376, turn: 2000 }
+    const wrapper = mount(StatsBar, { props: { game, target: 0, progress: 0 } })
+
+    expect(wrapper.get('.stats__number').text()).toBe('584,376 points')
+    expect(wrapper.find('[role="progressbar"]').exists()).toBe(false)
   })
 })
 
@@ -549,7 +571,7 @@ describe('GameControls', () => {
     const wrapper = mount(GameControls, { props })
 
     expect(wrapper.get('input').attributes('aria-describedby')).toBe('target-hint')
-    expect(wrapper.get('#target-hint').text()).toContain('100000')
+    expect(wrapper.get('#target-hint').text()).toBe('0 plays until the dragon dies.')
   })
 
   it('updates the field when a saved target arrives', async () => {
@@ -651,14 +673,25 @@ describe('GameControls', () => {
     expect(wrapper.get('[role="alert"]').text()).toBe('Enter a target score.')
   })
 
-  it('blocks targets outside the allowed range', async () => {
+  it('blocks targets too large to count exactly', async () => {
     const wrapper = mount(GameControls, { props })
 
-    await wrapper.get('input').setValue('100001')
+    await wrapper.get('input').setValue('9007199254740992')
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('autoplay')).toBeUndefined()
-    expect(wrapper.get('[role="alert"]').text()).toBe('Pick a target between 1 and 100,000.')
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      'Enter a whole number of points, or 0 to play until the dragon dies.',
+    )
+  })
+
+  it('autoplays with no target at any score', async () => {
+    const wrapper = mount(GameControls, { props: { ...props, score: 500_000 } })
+
+    await wrapper.get('input').setValue('0')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('autoplay')).toEqual([[0]])
   })
 
   it('starts from the given target', () => {

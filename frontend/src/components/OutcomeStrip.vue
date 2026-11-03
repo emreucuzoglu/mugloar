@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { LastMove } from '../stores/game'
-import { formatNumber, turnTone } from '../utils/format'
+import { formatNumber, hasTarget, turnTone } from '../utils/format'
 import { TONE_GLYPHS } from '../utils/turnGlyphs'
 
 const props = defineProps<{ move: LastMove | null; autoplaying: boolean; target: number }>()
@@ -22,7 +22,9 @@ const tone = computed(() => (props.move ? turnTone(props.move.event) : null))
         {{ change.text }}
       </li>
     </ul>
-    <p v-if="autoplaying" class="outcome__running">Autoplaying to {{ formatNumber(target) }}…</p>
+    <p v-if="autoplaying" class="outcome__running">
+      {{ hasTarget(target) ? `Autoplaying to ${formatNumber(target)}…` : 'Autoplaying until the dragon dies…' }}
+    </p>
   </div>
 </template>
 

@@ -1,11 +1,9 @@
 package com.mugloar.web;
 
-import com.mugloar.domain.GameState;
 import com.mugloar.domain.QuestBoard;
 import com.mugloar.domain.QuestEvaluation;
 import com.mugloar.domain.ShopOffer;
 import com.mugloar.game.GameService;
-import com.mugloar.solver.TurnEvent;
 import jakarta.validation.constraints.Pattern;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,18 +28,18 @@ class GameController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public GameState start() {
-    return gameService.start();
+  public GameStateView start() {
+    return GameStateView.of(gameService.start());
   }
 
   @GetMapping("/{gameId}")
-  public GameState state(@PathVariable @Pattern(regexp = ID) String gameId) {
-    return gameService.state(gameId);
+  public GameStateView state(@PathVariable @Pattern(regexp = ID) String gameId) {
+    return GameStateView.of(gameService.state(gameId));
   }
 
   @GetMapping("/{gameId}/history")
-  public List<TurnEvent> history(@PathVariable @Pattern(regexp = ID) String gameId) {
-    return gameService.history(gameId);
+  public List<TurnEventView> history(@PathVariable @Pattern(regexp = ID) String gameId) {
+    return TurnEventView.of(gameService.history(gameId));
   }
 
   @GetMapping("/{gameId}/quests")
@@ -65,26 +63,26 @@ class GameController {
   }
 
   @PostMapping("/{gameId}/quests/{questId}/solve")
-  public TurnEvent solve(
+  public TurnEventView solve(
       @PathVariable @Pattern(regexp = ID) String gameId,
       @PathVariable @Pattern(regexp = ID) String questId) {
-    return gameService.solve(gameId, questId);
+    return TurnEventView.of(gameService.solve(gameId, questId));
   }
 
   @PostMapping("/{gameId}/shop/{itemId}/buy")
-  public TurnEvent buy(
+  public TurnEventView buy(
       @PathVariable @Pattern(regexp = ID) String gameId,
       @PathVariable @Pattern(regexp = ITEM_ID) String itemId) {
-    return gameService.buy(gameId, itemId);
+    return TurnEventView.of(gameService.buy(gameId, itemId));
   }
 
   @PostMapping("/{gameId}/investigate")
-  public TurnEvent investigate(@PathVariable @Pattern(regexp = ID) String gameId) {
-    return gameService.investigate(gameId);
+  public TurnEventView investigate(@PathVariable @Pattern(regexp = ID) String gameId) {
+    return TurnEventView.of(gameService.investigate(gameId));
   }
 
   @PostMapping("/{gameId}/autoplay/step")
-  public List<TurnEvent> autoplayStep(@PathVariable @Pattern(regexp = ID) String gameId) {
-    return gameService.autoplayStep(gameId);
+  public List<TurnEventView> autoplayStep(@PathVariable @Pattern(regexp = ID) String gameId) {
+    return TurnEventView.of(gameService.autoplayStep(gameId));
   }
 }

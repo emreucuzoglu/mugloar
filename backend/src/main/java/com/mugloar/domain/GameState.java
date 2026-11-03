@@ -1,6 +1,5 @@
 package com.mugloar.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.With;
@@ -14,8 +13,9 @@ public record GameState(
     int score,
     int highScore,
     int turn,
-    @JsonIgnore double stateReputation,
-    @JsonIgnore Map<String, Integer> itemsBought) {
+    double stateReputation,
+    Map<String, Integer> itemsBought,
+    boolean purchaseUnconfirmed) {
 
   public GameState {
     itemsBought = itemsBought == null ? Map.of() : Map.copyOf(itemsBought);
@@ -35,7 +35,7 @@ public record GameState(
       int highScore,
       int turn,
       double stateReputation) {
-    this(gameId, lives, gold, level, score, highScore, turn, stateReputation, Map.of());
+    this(gameId, lives, gold, level, score, highScore, turn, stateReputation, Map.of(), false);
   }
 
   public GameState after(SolveResult r) {
@@ -48,7 +48,8 @@ public record GameState(
         r.highScore(),
         r.turn(),
         stateReputation,
-        itemsBought);
+        itemsBought,
+        false);
   }
 
   public GameState after(PurchaseResult r) {
@@ -61,13 +62,18 @@ public record GameState(
         highScore,
         r.turn(),
         stateReputation,
-        itemsBought);
+        itemsBought,
+        false);
   }
 
   public GameState afterBuying(String itemId) {
     Map<String, Integer> bought = new HashMap<>(itemsBought);
     bought.merge(itemId, 1, Integer::sum);
     return withItemsBought(bought);
+  }
+
+  public GameState afterPossiblePurchase(String itemId) {
+    return afterBuying(itemId).withPurchaseUnconfirmed(true);
   }
 
   public int timesBought(String itemId) {
@@ -90,7 +96,6 @@ public record GameState(
     return withLives(0);
   }
 
-  @JsonIgnore
   public boolean isOver() {
     return lives <= 0;
   }

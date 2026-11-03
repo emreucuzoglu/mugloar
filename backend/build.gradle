@@ -108,8 +108,10 @@ tasks.register('solve', JavaExec) {
     systemProperty 'spring.devtools.restart.enabled', 'false'
     def games = project.findProperty('games') ?: '1'
     def target = project.findProperty('target') ?: '0'
+    def maxMoves = project.findProperty('maxMoves') ?: '0'
     args = ['--spring.profiles.active=solver',
             '--spring.main.web-application-type=none',
             "--mugloar.solver.games=${games}",
-            "--mugloar.solver.target-score=${target}"]
+            "--mugloar.solver.target-score=${target}",
+            "--mugloar.solver.max-moves=${maxMoves}"]
 }
