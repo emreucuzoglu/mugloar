@@ -238,7 +238,7 @@ class BalancedShoppingStrategyTest {
       strategy
           .nextPurchase(state, SHOP, NO_JOBS)
           .ifPresent(item -> {
-            int reserve = item.id().equals(POTION.id()) ? 0 : RESERVE;
+            long reserve = item.id().equals(POTION.id()) ? 0 : RESERVE;
             assertThat(item.cost() + reserve).as("%s", state).isLessThanOrEqualTo(state.gold());
           });
     }

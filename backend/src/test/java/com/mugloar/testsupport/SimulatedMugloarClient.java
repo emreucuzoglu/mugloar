@@ -75,9 +75,9 @@ public class SimulatedMugloarClient extends MugloarClient {
   private final String gameId = "SIMGAME1";
   private final List<Entry> board = new ArrayList<>();
   private int lives = 3;
-  private int gold;
+  private long gold;
   private int level;
-  private int score;
+  private long score;
   private int turn;
   private int nextId;
   private double stateReputation;
@@ -120,7 +120,7 @@ public class SimulatedMugloarClient extends MugloarClient {
     return stateReputation;
   }
 
-  public int gold() {
+  public long gold() {
     return gold;
   }
 

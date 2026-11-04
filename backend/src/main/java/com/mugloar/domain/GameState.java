@@ -8,10 +8,10 @@ import lombok.With;
 public record GameState(
     String gameId,
     int lives,
-    int gold,
+    long gold,
     int level,
-    int score,
-    int highScore,
+    long score,
+    long highScore,
     int turn,
     double stateReputation,
     Map<String, Integer> itemsBought,
@@ -22,17 +22,17 @@ public record GameState(
   }
 
   public GameState(
-      String gameId, int lives, int gold, int level, int score, int highScore, int turn) {
+      String gameId, int lives, long gold, int level, long score, long highScore, int turn) {
     this(gameId, lives, gold, level, score, highScore, turn, 0);
   }
 
   public GameState(
       String gameId,
       int lives,
-      int gold,
+      long gold,
       int level,
-      int score,
-      int highScore,
+      long score,
+      long highScore,
       int turn,
       double stateReputation) {
     this(gameId, lives, gold, level, score, highScore, turn, stateReputation, Map.of(), false);

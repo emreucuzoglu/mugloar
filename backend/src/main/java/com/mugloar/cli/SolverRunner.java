@@ -52,7 +52,7 @@ class SolverRunner implements CommandLineRunner {
       log.info("No game could be played");
       return;
     }
-    var scores = results.stream().mapToInt(GameResult::score).summaryStatistics();
+    var scores = results.stream().mapToLong(GameResult::score).summaryStatistics();
     long over1000 = results.stream().filter(r -> r.score() >= REQUIRED_SCORE).count();
     log.info(
         "Played {} game(s): min {}, avg {}, max {}; {} reached 1000+",

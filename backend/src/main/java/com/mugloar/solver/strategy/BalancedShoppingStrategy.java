@@ -51,7 +51,7 @@ public final class BalancedShoppingStrategy implements ShoppingStrategy {
    * keeps up.
    */
   private Optional<ShopItem> bestUpgrade(GameState state, List<ShopItem> shop) {
-    int budget = state.gold() - settings.goldReserve();
+    long budget = state.gold() - settings.goldReserve();
     int biggestGain =
         shop.stream().mapToInt(item -> gain(item, Item::levelsGained)).max().orElse(0);
     int smallestGain = state.turn() < settings.smallUpgradesUntilTurn() ? ANY_GAIN : biggestGain;

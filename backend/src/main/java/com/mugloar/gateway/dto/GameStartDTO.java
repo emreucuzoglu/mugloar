@@ -1,4 +1,4 @@
 package com.mugloar.gateway.dto;
 
 public record GameStartDTO(
-    String gameId, int lives, int gold, int level, int score, int highScore, int turn) {}
+    String gameId, int lives, long gold, int level, long score, long highScore, int turn) {}

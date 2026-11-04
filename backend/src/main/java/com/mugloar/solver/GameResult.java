@@ -12,7 +12,7 @@ public record GameResult(GameState finalState, int moves, StopReason reason) {
     RATE_LIMITED
   }
 
-  public int score() {
+  public long score() {
     return finalState.score();
   }
 }

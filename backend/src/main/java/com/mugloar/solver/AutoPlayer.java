@@ -40,7 +40,7 @@ public final class AutoPlayer {
   @NonNull private final ShoppingStrategy shopping;
 
   public GameResult play(
-      GameState start, int targetScore, int maxMoves, Consumer<TurnEvent> listener) {
+      GameState start, long targetScore, int maxMoves, Consumer<TurnEvent> listener) {
     Consumer<TurnEvent> sink = listener == null ? e -> {} : listener;
     List<ShopItem> shop = loadShop(start.gameId());
     GameState state = start;

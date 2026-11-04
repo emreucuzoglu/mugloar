@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IntSummaryStatistics;
 import java.util.List;
+import java.util.LongSummaryStatistics;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
@@ -867,9 +868,9 @@ class AutoPlayerTest {
   void simulatedGamesUntilDeathResembleTheLiveGame() {
     int games = 100;
     int reachedTheLimit = 0;
-    IntSummaryStatistics deathScores = new IntSummaryStatistics();
+    LongSummaryStatistics deathScores = new LongSummaryStatistics();
     IntSummaryStatistics deathMoves = new IntSummaryStatistics();
-    IntSummaryStatistics limitScores = new IntSummaryStatistics();
+    LongSummaryStatistics limitScores = new LongSummaryStatistics();
     for (long seed = 100; seed < 100 + games; seed++) {
       SimulatedMugloarClient sim = new SimulatedMugloarClient(seed);
       AutoPlayer alwaysBuys =

@@ -142,10 +142,10 @@ public final class Fixtures {
   public static final class GameStateBuilder {
     private String gameId = GAME_ID;
     private int lives = 3;
-    private int gold;
+    private long gold;
     private int level;
-    private int score;
-    private int highScore;
+    private long score;
+    private long highScore;
     private int turn;
     private double stateReputation;
 
@@ -186,9 +186,9 @@ public final class Fixtures {
   public static final class SolveResultBuilder {
     private boolean success = true;
     private int lives = 3;
-    private int gold = 20;
-    private int score = 20;
-    private int highScore = 20;
+    private long gold = 20;
+    private long score = 20;
+    private long highScore = 20;
     private int turn = 1;
     private String message = "ok";
 
@@ -200,7 +200,7 @@ public final class Fixtures {
   @Setter
   public static final class PurchaseResultBuilder {
     private boolean shoppingSuccess = true;
-    private int gold = 10;
+    private long gold = 10;
     private int lives = 3;
     private int level;
     private int turn = 1;
@@ -237,10 +237,10 @@ public final class Fixtures {
   public static final class GameStartDtoBuilder {
     private String gameId = GAME_ID;
     private int lives = 3;
-    private int gold;
+    private long gold;
     private int level;
-    private int score;
-    private int highScore;
+    private long score;
+    private long highScore;
     private int turn;
 
     public GameStartDTO build() {
@@ -266,9 +266,9 @@ public final class Fixtures {
   public static final class SolveResultDtoBuilder {
     private boolean success = true;
     private int lives = 3;
-    private int gold = 20;
-    private int score = 20;
-    private int highScore = 20;
+    private long gold = 20;
+    private long score = 20;
+    private long highScore = 20;
     private int turn = 1;
     private String message = "ok";
 
@@ -280,7 +280,7 @@ public final class Fixtures {
   @Setter
   public static final class PurchaseResultDtoBuilder {
     private boolean shoppingSuccess = true;
-    private int gold = 10;
+    private long gold = 10;
     private int lives = 3;
     private int level;
     private int turn = 1;

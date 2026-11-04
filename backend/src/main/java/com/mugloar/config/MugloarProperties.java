@@ -31,5 +31,5 @@ public record MugloarProperties(
     shopping = shopping == null ? ShoppingSettings.defaults() : shopping;
   }
 
-  public record Solver(@Min(1) int games, @Min(0) int targetScore, @Min(0) int maxMoves) {}
+  public record Solver(@Min(1) int games, @Min(0) long targetScore, @Min(0) int maxMoves) {}
 }

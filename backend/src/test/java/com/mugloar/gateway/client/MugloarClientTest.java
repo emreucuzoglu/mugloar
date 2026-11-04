@@ -174,6 +174,28 @@ class MugloarClientTest {
   }
 
   @Test
+  void readsScoresAndGoldBeyondTheIntRange() {
+    server
+        .expect(requestTo(BASE + "/g1/solve/ad1"))
+        .andRespond(
+            withSuccess(
+                """
+                {"success":true,"lives":3,"gold":2200000000,"score":2300000000,"highScore":2300000000,"turn":36000,"message":"Done"}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    assertThat(client.solve("g1", "ad1"))
+        .isEqualTo(
+            aSolveResultDto()
+                .gold(2_200_000_000L)
+                .score(2_300_000_000L)
+                .highScore(2_300_000_000L)
+                .turn(36_000)
+                .message("Done")
+                .build());
+  }
+
+  @Test
   void readsShopAndBuys() {
     server
         .expect(requestTo(BASE + "/g1/shop"))

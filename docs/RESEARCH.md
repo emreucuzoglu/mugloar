@@ -235,7 +235,7 @@ Harvesting takes a job instead of buying while at least 7 of the 10 jobs on the 
 | 3,846 | 24,267,285 | 1,121,634 |
 | 4,746 | 36,854,849 | 1,413,253 |
 
-By turn 4,746 it had failed 8 jobs and still had 3 lives. It held 36 million unspent gold, because it only bought when the board slipped. Its score has been close to 1.6 × turn², which would pass the leaderboard's top score of 1,019,978,705 at about turn 25,000. This is one game, still running, and the extrapolation goes far beyond the data. The first game played with the rule never had 7 "Sure thing" jobs on its board and died at turn 143, as most games do, so harvesting doesn't change whether a game keeps up.
+By turn 4,746 it had failed 8 jobs and still had 3 lives. It held 36 million unspent gold, because it only bought when the board slipped. Its score stayed close to 1.6 × turn², and it passed the leaderboard's top score of 1,019,978,705 at turn 24,946, as that predicted. It was stopped by the experiment's time limit at turn 35,586, still with 3 lives, with 2,083,386,677 points after 60 failed jobs. That is one game, so it shows the record can be beaten, not how often. The first game played with the rule never had 7 "Sure thing" jobs on its board and died at turn 143, as most games do, so harvesting doesn't change whether a game keeps up.
 
 ## Earlier solvers
 
